@@ -91,7 +91,7 @@ class MLP(nn.Module):
 
     def forward(self, x):
         x = self.dense_expansion(x)
-        x = self.dense_contraction(gelu(x))
+        x = self.dense_contraction(gelu(x)) # why not x = gelu(self.dense_contraction(x))
         return x
 
 
@@ -119,7 +119,6 @@ class Layer(nn.Module):
     def split_heads(self, tensor, num_heads, attention_head_size):
         """
         Splits hidden_size dim into attn_head_size and num_heads
-        
         """
         new_shape = tensor.size()[:-1] + (num_heads, attention_head_size)
         tensor = tensor.view(new_shape) # *new_shape --> new_shape https://github.com/huggingface/transformers/blob/5936c8c57ccb2bda3b3f28856a7ef992c5c9f451/src/transformers/models/gpt_neo/modeling_gpt_neo.py#L168
@@ -189,7 +188,7 @@ class Bert(nn.Module):
         super(Bert, self).__init__()
         self.config = Config.from_dict(config_dict)
         self.embeddings = nn.ModuleDict({
-          'token': nn.Embedding(self.config.vocab_size, self.config.hidden_size, padding_idx=0), # https://discuss.huggingface.co/t/bert-embeddings-for-padding-token-not-0/14594
+          'token': nn.Embedding(self.config.vocab_size, self.config.hidden_size, padding_idx=0), # why 0? https://discuss.huggingface.co/t/bert-embeddings-for-padding-token-not-0/14594
           'position': nn.Embedding(self.config.max_position_embeddings, self.config.hidden_size),
           'token_type': nn.Embedding(self.config.type_vocab_size, self.config.hidden_size),
         })
