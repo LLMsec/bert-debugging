@@ -77,8 +77,8 @@ class LayerNorm(nn.Module):
         self.variance_epsilon = variance_epsilon
 
     def forward(self, x):
-        u = x.mean(-1, keepdim=True)
-        s = (x + u).pow(2).mean(-1, keepdim=True)
+        u = x.mean(-1, keepdim=True)  # bug 0 repaced by -1
+        s = (x + u).pow(2).mean(-1, keepdim=True)  # bug 0 repaced by -1
         x = (x + u) / torch.sqrt(s + self.variance_epsilon)
         return self.gamma * x + self.beta
 
@@ -117,11 +117,18 @@ class Layer(nn.Module):
         self.ln2 = LayerNorm(config.hidden_size)
 
     def split_heads(self, tensor, num_heads, attention_head_size):
+        """
+        Splits hidden_size dim into attn_head_size and num_heads
+        
+        """
         new_shape = tensor.size()[:-1] + (num_heads, attention_head_size)
-        tensor = tensor.view(*new_shape)
+        tensor = tensor.view(new_shape) # *new_shape --> new_shape https://github.com/huggingface/transformers/blob/5936c8c57ccb2bda3b3f28856a7ef992c5c9f451/src/transformers/models/gpt_neo/modeling_gpt_neo.py#L168
         return tensor.permute(0, 2, 1, 3)
 
     def merge_heads(self, tensor, num_heads, attention_head_size):
+        """
+        Merges attn_head_size dim and num_attn_heads dim into hidden_size
+        """
         tensor = tensor.permute(0, 2, 1, 3).contiguous()
         new_shape = tensor.size()[:-2] + (num_heads * attention_head_size,)
         return tensor.view(new_shape)
@@ -162,6 +169,22 @@ class Layer(nn.Module):
 
 # Main class
 class Bert(nn.Module):
+    """BERT model ("Bidirectional Embedding Representations from a Transformer").
+
+    Example usage:
+    ```python
+    # Already been converted into WordPiece token ids
+    input_ids = torch.LongTensor([[31, 51, 99], [15, 5, 0]])
+    input_mask = torch.LongTensor([[1, 1, 1], [1, 1, 0]])
+    token_type_ids = torch.LongTensor([[0, 0, 1], [0, 2, 0]])
+
+    config = modeling.BertConfig(vocab_size=32000, hidden_size=512,
+        num_hidden_layers=8, num_attention_heads=6, intermediate_size=1024)
+
+    model = modeling.BertModel(config=config)
+    all_encoder_layers, pooled_output = model(input_ids, token_type_ids, input_mask)
+    ```
+    """
     def __init__(self, config_dict):
         super(Bert, self).__init__()
         self.config = Config.from_dict(config_dict)
@@ -185,10 +208,7 @@ class Bert(nn.Module):
         ]))
 
 
-    def forward(self, input_ids, attention_mask=None, token_type_ids=None, ):
-        print("input_ids", input_ids.shape)
-        # print("attention_mask", attention_mask.shape)
-        # print("token_type_ids", token_type_ids.shape)
+    def forward(self, input_ids, attention_mask=None, token_type_ids=None):
 
         position_ids = torch.arange(input_ids.size(1), dtype=torch.long, device=input_ids.device)
         position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
