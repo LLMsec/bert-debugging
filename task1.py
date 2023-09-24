@@ -68,7 +68,6 @@ class LayerNorm(nn.Module):
         self.variance_epsilon = variance_epsilon
 
     def forward(self, x):
-        print("x", x.shape)
         u = x.mean(0, keepdim=True)
         s = (x + u).pow(2).mean(0, keepdim=True)
         x = (x + u) / torch.sqrt(s + self.variance_epsilon)
@@ -176,8 +175,8 @@ class Bert(nn.Module):
             ('activation', nn.Tanh()),
         ]))
 
-    def forward(self, input_ids, attention_mask=None, token_type_ids=None, ):
 
+    def forward(self, input_ids, attention_mask=None, token_type_ids=None, ):
         print("input_ids", input_ids.shape)
         # print("attention_mask", attention_mask.shape)
         # print("token_type_ids", token_type_ids.shape)
@@ -202,16 +201,15 @@ class Bert(nn.Module):
     def load_model(self, path):
         self.load_state_dict(torch.load(path))
         return self
-    
 
-    
 
 if __name__ == "__main__":
     MODEL_NAME = 'prajjwal1/bert-tiny'
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
     #EXAMPLE USE
-    sentence = 'An example use of pretrained BERT with transformers library to encode a sentence'
+    sentence = 'Hallo'
+    # sentence = 'An example use of pretrained BERT with transformers library to encode a sentence'
     tokenized_sample = tokenizer(sentence, return_tensors='pt', padding='max_length', max_length=512)
 
     path_bin = 'bert_tiny.bin'
@@ -219,19 +217,13 @@ if __name__ == "__main__":
     if not check_file:
         print("!wget https://github.com/for-ai/bert/raw/master/bert_tiny.bin")
 
-
-    MODEL_NAME = 'prajjwal1/bert-tiny'
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-
     ## IF YOU CANNOT SOLVE PREVIOUS BUGS, USE THE LINE BELOW:
     ## bert = AutoModel.from_pretrained(MODEL_NAME)
-
     bert_config = {"hidden_size": 128, "num_attention_heads": 2, "num_hidden_layers": 2, "intermediate_size": 512, "vocab_size": 30522}
-    
     bert = Bert(bert_config).load_model(path_bin)
     
-    
-    output = bert(input_ids=tokenized_sample['input_ids'],  attention_mask=tokenized_sample['attention_mask'], token_type_ids=tokenized_sample["token_type_ids"],)
+    output = bert(input_ids=tokenized_sample['input_ids'],  attention_mask=tokenized_sample['attention_mask'],)
+    # output = bert(input_ids=tokenized_sample['input_ids'],  attention_mask=tokenized_sample['attention_mask'], token_type_ids=tokenized_sample["token_type_ids"],)
     
     # We use "pooler_output" for simplicity. This corresponds the last layer
     # hidden-state of the first token of the sequence (CLS token) after
