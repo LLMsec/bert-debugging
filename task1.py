@@ -26,10 +26,19 @@ from transformers import AutoTokenizer
 
 
 def gelu(x):
+    """ Original Implementation of the gelu activation function in Google Bert repo when initially created.
+        For information: OpenAI GPT's gelu is slightly different (and gives slightly different results):
+        0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
+        This is now written in C in torch.nn.functional
+        Also see https://arxiv.org/abs/1606.08415
+    """
     return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
 
 
 class Config(object):
+    """Configuration class to store the configuration of a BertModel.
+    https://blog.csdn.net/ZJRN1027/article/details/103685696
+    """
     def __init__(self,
                 vocab_size,
                 hidden_size=768,
@@ -59,7 +68,7 @@ class Config(object):
             config.__dict__[key] = value
         return config
 
-
+# help classes
 class LayerNorm(nn.Module):
     def __init__(self, hidden_size, variance_epsilon=1e-12):
         super(LayerNorm, self).__init__()
@@ -68,8 +77,8 @@ class LayerNorm(nn.Module):
         self.variance_epsilon = variance_epsilon
 
     def forward(self, x):
-        u = x.mean(0, keepdim=True)
-        s = (x + u).pow(2).mean(0, keepdim=True)
+        u = x.mean(-1, keepdim=True)
+        s = (x + u).pow(2).mean(-1, keepdim=True)
         x = (x + u) / torch.sqrt(s + self.variance_epsilon)
         return self.gamma * x + self.beta
 
@@ -151,13 +160,13 @@ class Layer(nn.Module):
 
         return m
 
-
+# Main class
 class Bert(nn.Module):
     def __init__(self, config_dict):
         super(Bert, self).__init__()
         self.config = Config.from_dict(config_dict)
         self.embeddings = nn.ModuleDict({
-          'token': nn.Embedding(self.config.vocab_size, self.config.hidden_size, padding_idx=0),
+          'token': nn.Embedding(self.config.vocab_size, self.config.hidden_size, padding_idx=0), # https://discuss.huggingface.co/t/bert-embeddings-for-padding-token-not-0/14594
           'position': nn.Embedding(self.config.max_position_embeddings, self.config.hidden_size),
           'token_type': nn.Embedding(self.config.type_vocab_size, self.config.hidden_size),
         })
@@ -221,6 +230,8 @@ if __name__ == "__main__":
     ## bert = AutoModel.from_pretrained(MODEL_NAME)
     bert_config = {"hidden_size": 128, "num_attention_heads": 2, "num_hidden_layers": 2, "intermediate_size": 512, "vocab_size": 30522}
     bert = Bert(bert_config).load_model(path_bin)
+
+    print(bert)
     
     output = bert(input_ids=tokenized_sample['input_ids'],  attention_mask=tokenized_sample['attention_mask'],)
     # output = bert(input_ids=tokenized_sample['input_ids'],  attention_mask=tokenized_sample['attention_mask'], token_type_ids=tokenized_sample["token_type_ids"],)
