@@ -24,38 +24,39 @@ from transformers import AutoTokenizer
 # If you can not find all the bugs, use the line below for AutoModel
 from transformers import AutoModel
 
+def load_sts_dataset(file_name):
+    # TODO: add code to load STS dataset in required format
+    sts_samples = {'test': []}
+    return sts_samples
+
+
+def tokenize_sentence_pair_dataset(dataset, tokenizer, max_length=512):
+    # TODO: add code to generate tokenized version of the dataset
+    tokenized_dataset = []
+    return tokenized_dataset
+
+
+def get_dataloader(tokenized_dataset, batch_size, shuffle=False):
+    return DataLoader(tokenized_dataset, batch_size=batch_size, shuffle=shuffle)
+
+
+def cosine_sim(a, b):
+    # TODO: Implement cosine similarity function **from scrach**:
+    # This method should expect two 2D matrices (batch, vector_dim) and
+    # return a 2D matrix (batch, batch) that contains all pairwise cosine similarities
+    return torch.zeros(a.shape[0], a.shape[0])
+
+
+def eval_loop(model, eval_dataloader, device):
+    # TODO: add code to for evaluation loop
+    # TODO: Use cosine_sim function above as distance metric for pearsonr and spearmanr functions that are imported
+    # return [eval_pearson_cosine, eval_spearman_cosine]
+    return [1, 2]  # fake data
+
+
 if __name__ == "__main__":
     data = pd.read_csv('stsbenchmark.tsv.gz', nrows=5, compression='gzip', delimiter='\t')
     data.head()
-
-    def load_sts_dataset(file_name):
-        #TODO: add code to load STS dataset in required format
-        sts_samples = {'test': []}
-        return sts_samples
-
-
-    def tokenize_sentence_pair_dataset(dataset, tokenizer, max_length=512):
-        #TODO: add code to generate tokenized version of the dataset
-        tokenized_dataset = []
-        return tokenized_dataset
-
-
-    def get_dataloader(tokenized_dataset, batch_size, shuffle=False):
-        return DataLoader(tokenized_dataset, batch_size=batch_size, shuffle=shuffle)
-
-
-    def cosine_sim(a, b):
-        # TODO: Implement cosine similarity function **from scrach**:
-        # This method should expect two 2D matrices (batch, vector_dim) and
-        # return a 2D matrix (batch, batch) that contains all pairwise cosine similarities
-        return torch.zeros(a.shape[0], a.shape[0])
-
-
-    def eval_loop(model, eval_dataloader, device):
-        #TODO: add code to for evaluation loop
-        #TODO: Use cosine_sim function above as distance metric for pearsonr and spearmanr functions that are imported
-        return [eval_pearson_cosine, eval_spearman_cosine]
-
 
     #INFO: model and tokenizer
     model_name = 'prajjwal1/bert-tiny'
