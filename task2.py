@@ -26,7 +26,16 @@ from transformers import AutoModel
 
 def load_sts_dataset(file_name):
     # TODO: add code to load STS dataset in required format
-    sts_samples = {'test': []}
+    with gzip.open(file_name, 'rb') as f:
+        content = f.read().decode('utf-8')
+
+    l_line = [line.split('\t') for line in content.split('\n') if '\t' in line]
+    df = pd.DataFrame(data=l_line[1:], columns=l_line[0], dtype=object)
+
+    df['score'] = pd.Series(data=[np.float32(score) for score in df['score']], dtype=np.float32, index=df.index)
+
+    sts_samples = {split: df.loc[df['split'].values == split] for split in np.unique(df['split'])}
+
     return sts_samples
 
 
@@ -55,9 +64,6 @@ def eval_loop(model, eval_dataloader, device):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv('stsbenchmark.tsv.gz', nrows=5, compression='gzip', delimiter='\t')
-    data.head()
-
     #INFO: model and tokenizer
     model_name = 'prajjwal1/bert-tiny'
     tokenizer = AutoTokenizer.from_pretrained(model_name)
