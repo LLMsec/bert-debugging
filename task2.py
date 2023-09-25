@@ -70,11 +70,13 @@ def eval_loop(model, eval_dataloader, device):
     # TODO: Use cosine_sim function above as distance metric for pearsonr and spearmanr functions that are imported
     # return [eval_pearson_cosine, eval_spearman_cosine]
 
+    
     model.eval()
+    model.to(device)
 
     for data in eval_dataloader:
         data = data.to(device)
-        
+
         output = model(data)
 
 
