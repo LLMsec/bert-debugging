@@ -27,13 +27,30 @@ from transformers import AutoModel
 
 def load_sts_dataset(file_name):
     # TODO: add code to load STS dataset in required format
-    sts_samples = {'test': []}
+    with gzip.open(file_name, 'rb') as f:
+        content = f.read().decode('utf-8')
+
+    l_line = [line.split('\t') for line in content.split('\r\n') if '\t' in line]
+    df = pd.DataFrame(data=l_line[1:], columns=l_line[0], dtype=object)
+
+    df['score'] = pd.Series(data=[np.float32(score) for score in df['score']], dtype=np.float32, index=df.index)
+
+    sts_samples = {split: df.loc[df['split'].values == split] for split in np.unique(df['split'])}
+
     return sts_samples
 
 
 def tokenize_sentence_pair_dataset(dataset, tokenizer, max_length=512):
     # TODO: add code to generate tokenized version of the dataset
-    tokenized_dataset = []
+
+    tokenized_dataset = dataset.copy() # df
+    for column in ['sentence1', 'sentence2']:
+        l_token = []
+        for sentence in tokenized_dataset[column].values:
+            sentence_token = tokenizer(sentence, return_tensors='pt', padding='max_length', max_length=max_length)
+            l_token.append(sentence_token)
+        tokenized_dataset[column + '_token'] = pd.Series(data=l_token, index=tokenized_dataset.index, dtype=object)
+
     return tokenized_dataset
 
 
