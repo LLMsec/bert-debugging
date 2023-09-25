@@ -84,11 +84,6 @@ def eval_loop(model, eval_dataloader, device):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv('stsbenchmark.tsv.gz', nrows=5, compression='gzip', delimiter='\t')
-    data.head()
-
-    load_sts_dataset(data)
-
     #INFO: model and tokenizer
     model_name = 'prajjwal1/bert-tiny'
     tokenizer = AutoTokenizer.from_pretrained(model_name)
