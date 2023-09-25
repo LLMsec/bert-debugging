@@ -24,6 +24,7 @@ from transformers import AutoTokenizer
 # If you can not find all the bugs, use the line below for AutoModel
 from transformers import AutoModel
 
+
 def load_sts_dataset(file_name):
     # TODO: add code to load STS dataset in required format
     sts_samples = {'test': []}
@@ -57,6 +58,8 @@ def eval_loop(model, eval_dataloader, device):
 if __name__ == "__main__":
     data = pd.read_csv('stsbenchmark.tsv.gz', nrows=5, compression='gzip', delimiter='\t')
     data.head()
+
+    load_sts_dataset(data)
 
     #INFO: model and tokenizer
     model_name = 'prajjwal1/bert-tiny'
