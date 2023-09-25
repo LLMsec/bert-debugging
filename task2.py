@@ -24,8 +24,6 @@ from transformers import AutoTokenizer
 # If you can not find all the bugs, use the line below for AutoModel
 from transformers import AutoModel
 
-
-
 if __name__ == "__main__":
     data = pd.read_csv('stsbenchmark.tsv.gz', nrows=5, compression='gzip', delimiter='\t')
     data.head()
@@ -64,8 +62,10 @@ if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     #INFO: load bert
-    bert_config = {"hidden_size": 128, "num_attention_heads": 2, "num_hidden_layers": 2, "intermediate_size": 512, "vocab_size": 30522}
-    bert = Bert(bert_config).load_model('bert_tiny.bin')
+    # bert_config = {"hidden_size": 128, "num_attention_heads": 2, "num_hidden_layers": 2, "intermediate_size": 512, "vocab_size": 30522}
+    # bert = Bert(bert_config).load_model('bert_tiny.bin')
+
+    bert = AutoModel.from_pretrained(model_name)
 
     #INFO: load dataset
     sts_dataset = load_sts_dataset('stsbenchmark.tsv.gz')
