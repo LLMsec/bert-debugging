@@ -1,7 +1,9 @@
 # bert-debugging
 
 
+https://docs.google.com/document/d/1QzES2769WJxeJ1zoBxf1Atua79Ao5u1bMBgzy4sqf2k/edit
 
+```
 Bert(
   (embeddings): ModuleDict(
     (token): Embedding(30522, 128, padding_idx=0)
@@ -30,3 +32,4 @@ Bert(
     (activation): Tanh()
   )
 )
+```
