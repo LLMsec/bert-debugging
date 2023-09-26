@@ -45,7 +45,7 @@ class Config(object):
                 num_hidden_layers=12,
                 num_attention_heads=12,
                 intermediate_size=3072,
-                dropout_prob=0.9,
+                dropout_prob=0.1,
                 max_position_embeddings=512,
                 type_vocab_size=2,
                 initializer_range=0.02):
@@ -136,7 +136,7 @@ class Layer(nn.Module):
         mask = attention_mask == 1
         mask = mask.unsqueeze(1).unsqueeze(2)
 
-        s = torch.matmul(q, k)
+        s = torch.matmul(q, k.transpose(-1, -2))
         s = s / math.sqrt(self.attention_head_size)
 
         s = torch.where(mask, s, torch.tensor(float('inf')))
@@ -217,7 +217,7 @@ class Bert(nn.Module):
         x = torch.cat((self.embeddings.token(input_ids),
                        self.embeddings.position(position_ids),
                        self.embeddings.token_type(token_type_ids)),
-                      dim=-1)
+                      dim=0)
         x = self.dropout(self.ln(x))
 
         for layer in self.layers:
