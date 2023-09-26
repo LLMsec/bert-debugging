@@ -28,54 +28,20 @@ from transformers import AutoModel
 
 def load_nli_dataset(file_name):
     #TODO: add code to load NLI dataset in required format
-    with gzip.open(file_name, 'rb') as f:
-        content = f.read().decode('utf-8')
-
-    l_line = [line.split('\t') for line in content.split('\r\n') if '\t' in line]
-    df = pd.DataFrame(data=l_line[1:], columns=l_line[0], dtype=object)
-
-    nli_samples = {split: df.loc[df['split'].values == split] for split in np.unique(df['split'])}
-
+    nli_samples = {'train': []}
     return nli_samples
-
-
-def tokenize_sentence_pair_dataset(dataset, tokenizer, max_length=512):
-    # TODO: add code to generate tokenized version of the dataset
-
-    df_tokenized = dataset.copy() # df
-    for column in ['sentence1', 'sentence2']:
-        l_token = []
-        for sentence in df_tokenized[column].values:
-            sentence_token = tokenizer(sentence, return_tensors='pt', padding='max_length', max_length=max_length)
-            l_token.append(sentence_token)
-        df_tokenized[column + '_token'] = pd.Series(data=l_token, index=df_tokenized.index, dtype=object)
-
-    tensor_1 = torch.from_numpy(np.array([token['input_ids'] for token in df_tokenized['sentence1_token'].values]))
-    tensor_2 = torch.from_numpy(np.array([token['input_ids'] for token in df_tokenized['sentence2_token'].values]))
-
-    tokenized_dataset = torch.utils.data.TensorDataset(tensor_1, tensor_2)
-
-    return tokenized_dataset
-
-
-def get_dataloader(tokenized_dataset, batch_size, shuffle=False):
-    return DataLoader(tokenized_dataset, batch_size=batch_size, shuffle=shuffle)
 
 
 # A periodic eval on dev test can be added (validation_dataloader)
 def train_loop(model, optimizer, train_dataloader, num_epochs, device):
     #TODO: add code to for training loop
     #TODO: use optimizer, train_dataloader, num_epoch and device for training
-    pass
 
 
 class BertClassifier(nn.Module):
     #TODO: add __init__ to construct BERTClassifier based on given pretrained BERT
     #TODO: add code for forward pass that returns the loss value
     #TODO: add aditional method if required
-
-    def __init__(self):
-        pass
 
 
 if __name__ == "__main__":
@@ -101,17 +67,14 @@ if __name__ == "__main__":
 
     #INFO: tokenize dataset
     #WARNING: Use only first 50000 samples and maximum sequence length of 128
-    tokenized_train = tokenize_sentence_pair_dataset(nli_dataset['train'][:5000], tokenizer, max_length=128)
+    tokenized_train = tokenize_sentence_pair_dataset(nli_dataset['train'][:50000], tokenizer, max_length=128)
 
     #INFO: generate train_dataloader
     train_dataloader = get_dataloader(tokenized_train, batch_size=batch_size, shuffle=True)
 
-    model_name = 'prajjwal1/bert-tiny'
-    bert_classifier = AutoModel.from_pretrained(model_name)
-
     #TODO: Create a BertClassifier with required parameters
     ###    Replace None with required input based on yor implementation
-    # bert_classifier = BertClassifier(None)
+    bert_classifier = BertClassifier(None)
 
     #INFO: create optimizer and run training loop
     optimizer = AdamW(bert_classifier.parameters(), lr=5e-5)
