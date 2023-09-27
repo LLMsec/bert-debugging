@@ -199,7 +199,9 @@ class BertClassifier(nn.Module):
 
         self.loss_fct = torch.nn.CrossEntropyLoss()
 
-        self.classifier = torch.nn.Linear(8, 3)
+        self.classifier = torch.nn.Linear(config.vocab_size['hidden_size'] * 3, num_labels)
+
+        self.config = config
 
         def init_weights(module):
             if isinstance(module, (nn.Linear, nn.Embedding)):
@@ -244,18 +246,17 @@ class BertClassifier(nn.Module):
         u = pre_pooler_1.pooler_output
         v = pre_pooler_2.pooler_output
 
-        stack_u_v_diff_uv = torch.stack((u, v, torch.abs(u - v)), dim=0)
-        #stack_u_v_diff_uv = torch.stack((u, v, cosine_sim(u,v)), dim=0)
-        
-        logits = self.classifier(stack_u_v_diff_uv, 1)
+        stack_u_v_diff_uv = torch.stack((u, v, torch.abs(u - v)), dim=0) \
+            .transpose(1, 0) \
+            .reshape((batch_size, 3 * self.config.vocab_size['hidden_size']))
+
+        logits = self.classifier(stack_u_v_diff_uv)
         
         pred = torch.nn.functional.softmax(logits, dim=1)
+        classified = torch.max(pred, dim=1)
 
-       
-        
-
-
-        loss =  self.loss_fct(pred, label)
+        loss = self.loss_fct(classified[1].to(torch.float32), label)
+        loss.requires_grad_()
 
         return loss
 
