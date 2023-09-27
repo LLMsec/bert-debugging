@@ -22,6 +22,7 @@ np.random.seed(0)
 
 # %pip install transformers
 from transformers import AutoTokenizer
+
 # If you can not find all the bugs, use the line below for AutoModel
 from transformers import AutoModel
 
@@ -41,7 +42,6 @@ def load_nli_dataset(file_name):
 
 def tokenize_sentence_pair_dataset(dataset: pd.DataFrame, tokenizer, max_length=512):
     # TODO: add code to generate tokenized version of the dataset
-
     df_tokenized: pd.DataFrame = dataset.copy() # df
     df_tokenized['sentence1_input_ids'] = None
     df_tokenized['sentence1_token_type_ids'] = None
@@ -51,14 +51,12 @@ def tokenize_sentence_pair_dataset(dataset: pd.DataFrame, tokenizer, max_length=
     df_tokenized['sentence2_attention_mask'] = None
 
     for row_idx, row in df_tokenized.iterrows():
-        d_token_1 = tokenizer(row['sentence1'], return_tensors='pt',
-                                                              padding='max_length', max_length=max_length)
+        d_token_1 = tokenizer(row['sentence1'], return_tensors='pt', padding='max_length', max_length=max_length)
         df_tokenized._set_value(row_idx, 'sentence1_input_ids', np.array(d_token_1['input_ids']))
         df_tokenized._set_value(row_idx, 'sentence1_token_type_ids', np.array(d_token_1['token_type_ids']))
         df_tokenized._set_value(row_idx, 'sentence1_attention_mask', np.array(d_token_1['attention_mask']))
 
-        d_token_2 = tokenizer(row['sentence2'], return_tensors='pt',
-                                                              padding='max_length', max_length=max_length)
+        d_token_2 = tokenizer(row['sentence2'], return_tensors='pt', padding='max_length', max_length=max_length)
         df_tokenized._set_value(row_idx, 'sentence2_input_ids', np.array(d_token_2['input_ids']))
         df_tokenized._set_value(row_idx, 'sentence2_token_type_ids', np.array(d_token_2['token_type_ids']))
         df_tokenized._set_value(row_idx, 'sentence2_attention_mask', np.array(d_token_2['attention_mask']))
@@ -128,6 +126,7 @@ def train_loop(model, optimizer, train_dataloader, num_epochs, device):
 
             print("loss", loss)
 
+            
 class Config(object):
     """Configuration class to store the configuration of a BertModel.
     https://blog.csdn.net/ZJRN1027/article/details/103685696
@@ -198,6 +197,10 @@ class BertClassifier(nn.Module):
         super(BertClassifier, self).__init__()
         self.bert = AutoModel.from_pretrained(model_name)
 
+        self.loss_fct = torch.nn.CrossEntropyLoss()
+
+        self.classifier = torch.nn.Linear(8, 3)
+
         def init_weights(module):
             if isinstance(module, (nn.Linear, nn.Embedding)):
                 # Slightly different from the TF version which uses truncated_normal for initialization
@@ -242,10 +245,17 @@ class BertClassifier(nn.Module):
         v = pre_pooler_2.pooler_output
 
         stack_u_v_diff_uv = torch.stack((u, v, torch.abs(u - v)), dim=0)
-        logits = torch.nn.functional.softmax(stack_u_v_diff_uv, dim=-1)
+        #stack_u_v_diff_uv = torch.stack((u, v, cosine_sim(u,v)), dim=0)
+        
+        logits = self.classifier(stack_u_v_diff_uv, 1)
+        
+        pred = torch.nn.functional.softmax(logits, dim=1)
 
-        loss_fct = torch.nn.CrossEntropyLoss()
-        loss = loss_fct(logits, label)
+       
+        
+
+
+        loss =  self.loss_fct(pred, label)
 
         return loss
 
@@ -253,10 +263,10 @@ class BertClassifier(nn.Module):
 if __name__ == "__main__":
     
     file_name = 'AllNLI.tsv.gz'
-    check_file = os.path.isfile(file_name)
-    if not check_file:
-        url = 'https://sbert.net/datasets/AllNLI.tsv.gz'
-        filename = wget.download(url)
+    # check_file = os.path.isfile(file_name)
+    # if not check_file:
+    #     url = 'https://sbert.net/datasets/AllNLI.tsv.gz'
+    #     filename = wget.download(url)
         
     #INFO: model and training configs
     model_name = 'prajjwal1/bert-tiny'
