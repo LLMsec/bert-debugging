@@ -32,26 +32,50 @@ def load_nli_dataset(file_name):
     l_line = [line.split('\t') for line in content.split('\r\n') if '\t' in line]
     df = pd.DataFrame(data=l_line[1:], columns=l_line[0], dtype=object)
 
+    labels_unique = np.unique(df['label'].values)
+
     nli_samples = {split: df.loc[df['split'].values == split] for split in np.unique(df['split'])}
 
-    return nli_samples
+    return nli_samples, labels_unique
 
 
-def tokenize_sentence_pair_dataset(dataset, tokenizer, max_length=512):
+def tokenize_sentence_pair_dataset(dataset: pd.DataFrame, tokenizer, max_length=512):
     # TODO: add code to generate tokenized version of the dataset
 
-    df_tokenized = dataset.copy() # df
-    for column in ['sentence1', 'sentence2']:
-        l_token = []
-        for sentence in df_tokenized[column].values:
-            sentence_token = tokenizer(sentence, return_tensors='pt', padding='max_length', max_length=max_length)
-            l_token.append(sentence_token)
-        df_tokenized[column + '_token'] = pd.Series(data=l_token, index=df_tokenized.index, dtype=object)
+    df_tokenized: pd.DataFrame = dataset.copy() # df
+    df_tokenized['sentence1_input_ids'] = None
+    df_tokenized['sentence1_token_type_ids'] = None
+    df_tokenized['sentence1_attention_mask'] = None
+    df_tokenized['sentence2_input_ids'] = None
+    df_tokenized['sentence2_token_type_ids'] = None
+    df_tokenized['sentence2_attention_mask'] = None
 
-    tensor_1 = torch.from_numpy(np.array([token['input_ids'] for token in df_tokenized['sentence1_token'].values]))
-    tensor_2 = torch.from_numpy(np.array([token['input_ids'] for token in df_tokenized['sentence2_token'].values]))
+    for row_idx, row in df_tokenized.iterrows():
+        d_token_1 = tokenizer(row['sentence1'], return_tensors='pt',
+                                                              padding='max_length', max_length=max_length)
+        df_tokenized._set_value(row_idx, 'sentence1_input_ids', np.array(d_token_1['input_ids']))
+        df_tokenized._set_value(row_idx, 'sentence1_token_type_ids', np.array(d_token_1['token_type_ids']))
+        df_tokenized._set_value(row_idx, 'sentence1_attention_mask', np.array(d_token_1['attention_mask']))
 
-    tokenized_dataset = torch.utils.data.TensorDataset(tensor_1, tensor_2)
+        d_token_2 = tokenizer(row['sentence2'], return_tensors='pt',
+                                                              padding='max_length', max_length=max_length)
+        df_tokenized._set_value(row_idx, 'sentence2_input_ids', np.array(d_token_2['input_ids']))
+        df_tokenized._set_value(row_idx, 'sentence2_token_type_ids', np.array(d_token_2['token_type_ids']))
+        df_tokenized._set_value(row_idx, 'sentence2_attention_mask', np.array(d_token_2['attention_mask']))
+
+    tensor_1_input_ids = torch.from_numpy(np.stack(df_tokenized['sentence1_input_ids'].values))
+    tensor_1_token_type_ids = torch.from_numpy(np.stack(df_tokenized['sentence1_token_type_ids'].values))
+    tensor_1_attention_mask = torch.from_numpy(np.stack(df_tokenized['sentence1_attention_mask'].values))
+
+    tensor_2_input_ids = torch.from_numpy(np.stack(df_tokenized['sentence2_input_ids'].values))
+    tensor_2_token_type_ids = torch.from_numpy(np.stack(df_tokenized['sentence2_token_type_ids'].values))
+    tensor_2_attention_mask = torch.from_numpy(np.stack(df_tokenized['sentence2_attention_mask'].values))
+
+    tokenized_dataset = torch.utils.data.TensorDataset(
+        tensor_1_input_ids, tensor_1_token_type_ids, tensor_1_attention_mask,
+        tensor_2_input_ids, tensor_2_token_type_ids, tensor_2_attention_mask,
+        torch.Tensor(np.array([d_label_to_int[label] for label in df_tokenized['label'].values], dtype=np.int32)),
+    )
 
     return tokenized_dataset
 
@@ -71,36 +95,38 @@ def cosine_sim(a, b):
 
     return divident / divisor
 
+
 # A periodic eval on dev test can be added (validation_dataloader)
 def train_loop(model, optimizer, train_dataloader, num_epochs, device):
-    #TODO: add code to for training loop
-    #TODO: use optimizer, train_dataloader, num_epoch and device for training
+    # TODO: add code to for training loop
+    # TODO: use optimizer, train_dataloader, num_epoch and device for training
 
     model.train()
     model.to(device)
 
     for _ in range(num_epochs):
         for data in train_dataloader:
-            a = data[0].to(device)
-            b = data[1].to(device)
+            input_ids_1 = data[0].to(device)
+            token_type_ids_1 = data[1].to(device)
+            attention_mask_1 = data[2].to(device)
 
-            batch_a, size_a, vec_size_a = a.shape
-            batch_b, size_b, vec_size_b = b.shape
+            input_ids_2 = data[3].to(device)
+            token_type_ids_2 = data[4].to(device)
+            attention_mask_2 = data[5].to(device)
 
-            a = a.reshape((batch_a, vec_size_a)) # .type(torch.float32)
-            b = b.reshape((batch_b, vec_size_b)) # .type(torch.float32)
+            label = data[6].to(device)
 
-            a_kacke = model.bert(a)
-            b_kacke = model.bert(b)
+            loss = model(
+                input_ids_1, token_type_ids_1, attention_mask_1,
+                input_ids_2, token_type_ids_2, attention_mask_2,
+                label,
+                optimizer,
+            )
 
-            u = a_kacke.pooler_output
-            v = b_kacke.pooler_output
+            loss.backward()
+            optimizer.step()
 
-            val_sim = cosine_sim(a=u, b=v)
-
-            output = model(u, v, val_sim)
-
-    pass
+            print("loss", loss)
 
 class Config(object):
     """Configuration class to store the configuration of a BertModel.
@@ -165,56 +191,63 @@ class BertPooler(nn.Module):
 
 
 class BertClassifier(nn.Module):
-    def __init__(self, config, num_labels, pooling="max"):
+    # TODO: add __init__ to construct BERTClassifier based on given pretrained BERT
+    # TODO: add code for forward pass that returns the loss value
+    # TODO: add aditional method if required
+    def __init__(self, config, num_labels=3):
         super(BertClassifier, self).__init__()
-        # self.bert = BertModel(config)
-
-        model_name = 'prajjwal1/bert-tiny'
         self.bert = AutoModel.from_pretrained(model_name)
-        self.bert_pooler = BertPooler(config)
-
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.classifier = nn.Linear(config.hidden_size, num_labels)
-        self.pooling = pooling
-        assert self.pooling in ["max", "sum", "last"]
 
         def init_weights(module):
             if isinstance(module, (nn.Linear, nn.Embedding)):
                 # Slightly different from the TF version which uses truncated_normal for initialization
                 # cf https://github.com/pytorch/pytorch/pull/5617
                 module.weight.data.normal_(mean=0.0, std=config.initializer_range)
-            elif isinstance(module, LayerNorm):
-                module.beta.data.normal_(mean=0.0, std=config.initializer_range)
-                module.gamma.data.normal_(mean=0.0, std=config.initializer_range)
+            # elif isinstance(module, LayerNorm):
+            #     module.beta.data.normal_(mean=0.0, std=config.initializer_range)
+            #     module.gamma.data.normal_(mean=0.0, std=config.initializer_range)
             if isinstance(module, nn.Linear):
                 module.bias.data.zero_()
+
         self.apply(init_weights)
 
-    def forward(self, batch, global_step=0):
-        input_ids, attention_mask, token_type_ids = batch[:3]
-        all_encoder_layers, pooled_output = self.bert(input_ids, token_type_ids, attention_mask)
+    def forward(
+            self,
+            input_ids_1, token_type_ids_1, attention_mask_1,
+            input_ids_2, token_type_ids_2, attention_mask_2,
+            label,
+            optimizer, global_step=0,
+        ):
 
-        if self.pooling == "max":
-            output = torch.max(all_encoder_layers[-1], 1)[0]
-        elif self.pooling == "sum":
-            output = torch.sum(all_encoder_layers[-1], 1)
-        elif self.pooling == "last":
-            output = pooled_output
-        else:
-            raise NotImplementedError()
+        shape_input_ids_1 = input_ids_1.shape
+        shape_token_type_ids_1 = token_type_ids_1.shape
+        shape_attention_mask_1 = attention_mask_1.shape
 
-        logits = self.classifier(output)
+        shape_input_ids_2 = input_ids_2.shape
+        shape_token_type_ids_2 = token_type_ids_2.shape
+        shape_attention_mask_2 = attention_mask_2.shape
 
-        if len(batch) == 4:
-            loss_fct = nn.CrossEntropyLoss()
-            labels = batch[-1]
-            assert labels.size() == (logits.size()[0], 1)
-            loss = loss_fct(logits, labels[:,0])
-            return loss
-        elif len(batch) == 3:
-            return logits
-        else:
-            raise NotImplementedError()
+        input_ids_1 = input_ids_1.reshape((shape_input_ids_1[0], shape_input_ids_1[2]))
+        token_type_ids_1 = token_type_ids_1.reshape((shape_token_type_ids_1[0], shape_token_type_ids_1[2]))
+        attention_mask_1 = attention_mask_1.reshape((shape_attention_mask_1[0], shape_attention_mask_1[2]))
+
+        input_ids_2 = input_ids_2.reshape((shape_input_ids_2[0], shape_input_ids_2[2]))
+        token_type_ids_2 = token_type_ids_2.reshape((shape_token_type_ids_2[0], shape_token_type_ids_2[2]))
+        attention_mask_2 = attention_mask_2.reshape((shape_attention_mask_2[0], shape_attention_mask_2[2]))
+
+        pre_pooler_1 = self.bert(input_ids_1, token_type_ids_1, attention_mask_1)
+        pre_pooler_2 = self.bert(input_ids_2, token_type_ids_2, attention_mask_2)
+
+        u = pre_pooler_1.pooler_output
+        v = pre_pooler_2.pooler_output
+
+        stack_u_v_diff_uv = torch.stack((u, v, torch.abs(u - v)), dim=0)
+        logits = torch.nn.functional.softmax(stack_u_v_diff_uv, dim=-1)
+
+        loss_fct = torch.nn.CrossEntropyLoss()
+        loss = loss_fct(logits, label)
+
+        return loss
 
 
 if __name__ == "__main__":
@@ -237,7 +270,8 @@ if __name__ == "__main__":
     bert_path = 'bert_tiny.bin'
 
     #INFO: load nli dataset
-    nli_dataset = load_nli_dataset('AllNLI.tsv.gz')
+    nli_dataset, labels_unique = load_nli_dataset('AllNLI.tsv.gz')
+    d_label_to_int = {label: i for i, label in enumerate(labels_unique, 0)}
 
     #INFO: tokenize dataset
     #WARNING: Use only first 50000 samples and maximum sequence length of 128
